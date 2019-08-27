@@ -1,3 +1,5 @@
 *.json
 /.vscode
 *.txt
+/customer
+__*
