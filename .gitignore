@@ -1,5 +1,6 @@
 *.json
 /.vscode
 *.txt
-/customer
+/configurations
 __*
+*.ini

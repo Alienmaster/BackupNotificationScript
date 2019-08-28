@@ -1,10 +1,17 @@
 from exchangelib import Credentials, Account, Configuration, DELEGATE, Folder, EWSTimeZone, EWSDateTime, CalendarItem
 from exchangelib.util import PrettyXmlHandler
 import configparser, logging
-import load_costumer
+import datetime
+import load_customer
 
 class BackupNotificationScript():
     def __init__(self):
+        # Set Timezone to local Timezone
+        self._tz = EWSTimeZone.localzone()
+
+        # set start and end time of Calendarentry
+        self.init_time()
+
         # Logger
         logging.basicConfig(level=logging.WARNING, handlers=[PrettyXmlHandler()])
 
@@ -23,26 +30,41 @@ class BackupNotificationScript():
                                     "Primary_SMTP_Adress": LoginData['Primary SMTP Adress']
                             }
 
-        # Set Timezone to local Timezone
-        self._tz = EWSTimeZone.localzone()
-        # tz.localize(EWSDateTime.now())
-
         # Credentials and account
         self._credentials = Credentials(username = _Login["user"]
                             , password = _Login["password"])
 
         # Autodiscover fails w/o mail_config. See issue #337 on github exchangelib
-        self._mail_config = Configuration(server = 'outlook.office365.com'
+        self._mailConfig = Configuration(server = 'outlook.office365.com'
                             , credentials = self._credentials)
 
-        self._account = Account(default_timezone=self._tz, primary_smtp_address = _Login["Primary_SMTP_Adress"], config = self._mail_config, credentials=self._credentials, autodiscover=False, access_type=DELEGATE)
+        self._account = Account(default_timezone=self._tz, 
+                                primary_smtp_address = _Login["Primary_SMTP_Adress"], 
+                                config = self._mailConfig, 
+                                credentials=self._credentials, 
+                                autodiscover=False, 
+                                access_type=DELEGATE)
 
-    def generate_user(self):
-        # For every txt File in Costumer generate a list/dictionary of values
-        pass
+    def init_time(self):
+        '''
+        Initialize the time with start and endTime
+        saves a localized EWSDateTime formatted start and endtime
+        '''
+        tz = self._tz
 
+        today = datetime.date.today()
+        st = datetime.time(hour=21, minute=00)
+        et = datetime.time(hour=22, minute=00)
+        # forgive me father because I have sinned
+        self._startTime = EWSDateTime.from_datetime(tz.localize(datetime.datetime.combine(today, st)))
+        self._endTime = EWSDateTime.from_datetime(tz.localize(datetime.datetime.combine(today, et)))
 
+    def load_customer(self):
+        CL = load_customer.load_customer()
+        CL = CL.get_customer_list()
 
+        print(CL)
+        
     def analyze_mails(self):
         mails = self._mails
 
@@ -51,47 +73,54 @@ class BackupNotificationScript():
         #     pass
 
     
-    def create_Calender_item(self, _end, _subject, _body, _start = EWSDateTime.now()):
-        tz = self._tz
+    def create_Calender_item(self, _subject, _body,):
+        '''
+        creates Calendar item
+        uses the global startTime and endTime
+        :param str _subject: Subject of the calendar entry
+        :param str _body: content of the calendar entry
+        '''
+
+        startTime = self._startTime
+        endTime = self._endTime
+        
         a = self._account
 
-        startTime = tz.localize(_start)
-        endTime = tz.localize(_end)
         subject = _subject
         body = _body
-
         newCalenderItem = CalendarItem(start=startTime, end=endTime, folder=a.calendar, subject=subject, body=body)
         newCalenderItem.save()
 
+    def update_Calender_item(self):
+
+        pass
+
+
     def folder_print(self):
+        '''
+        Does actual to much stuff
+        Kind of testing method for playing purposes
+        '''
         tz = self._tz
         a = self._account
-        # notaware DateTime
-        endTime = EWSDateTime(2019,8,27,17,00,0)
-        # aware DateTime
-        # endTime = tz.localize(endTime)
 
         a.root.refresh()
         # a.public_folders_root.refresh()
         # a.archive_root.refresh()
-        backupFolder = a.root // "Oberste Ebene des Informationsspeichers" // "Posteingang" // "!backup"
+        folder = a.root // "Oberste Ebene des Informationsspeichers" // "Posteingang" // "!backup"
+        # folder = a.root // "Oberste Ebene des Informationsspeichers" // "Posteingang"
 
 
-        for item in backupFolder.all()[:10]:
+        for item in folder.all()[:10]:
             if "finished" in item.body:
                 print(item.subject)
-                self.create_Calender_item(_start=EWSDateTime.now(), _end=endTime, _subject=item.subject, _body="MRWare Computer /n Erfolg")
-
-        # print(a.root.tree())
-        # print(inbox.children)
+                self.create_Calender_item(_subject=item.subject, _body="MRWare Computer /n Erfolg")
 
 
     def main(self):
         account = self._account
 
-        # for item in account.inbox.all().order_by('-datetime_received')[:10]:
-        #     print(item.subject, item.sender)
-
+        # Get the last 10 Mails of the inbox in order and put them into _mails
         self._mails = account.inbox.all().order_by('-datetime_received')[:10]
         
         self.analyze_mails()
