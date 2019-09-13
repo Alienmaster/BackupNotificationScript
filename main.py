@@ -3,6 +3,7 @@ from exchangelib.util import PrettyXmlHandler
 import configparser, logging
 import datetime
 import load_customer
+import exchange_database
 
 class BackupNotificationScript():
     def __init__(self):
@@ -45,6 +46,9 @@ class BackupNotificationScript():
                                 autodiscover=False, 
                                 access_type=DELEGATE)
 
+        # Init Database
+        self._db = exchange_database.exchange_database()
+
     def init_time(self):
         '''
         Initialize the time with start and endTime
@@ -73,7 +77,7 @@ class BackupNotificationScript():
         #     pass
 
     
-    def create_Calender_item(self, _subject, _body,):
+    def create_Calender_item(self, subject, body,):
         '''
         creates Calendar item
         uses the global startTime and endTime
@@ -86,8 +90,6 @@ class BackupNotificationScript():
         
         a = self._account
 
-        subject = _subject
-        body = _body
         newCalenderItem = CalendarItem(start=startTime, end=endTime, folder=a.calendar, subject=subject, body=body)
         newCalenderItem.save()
 
@@ -114,17 +116,32 @@ class BackupNotificationScript():
         for item in folder.all()[:10]:
             if "finished" in item.body:
                 print(item.subject)
-                self.create_Calender_item(_subject=item.subject, _body="MRWare Computer /n Erfolg")
+                self.create_Calender_item(subject=item.subject, body="MRWare Computer /n Erfolg")
 
-
-    def main(self):
+    def get_mails(self):
         account = self._account
 
         # Get the last 10 Mails of the inbox in order and put them into _mails
-        self._mails = account.inbox.all().order_by('-datetime_received')[:10]
-        
-        self.analyze_mails()
-        self.folder_print()
+        self._mails = account.inbox.all().order_by('-datetime_received')[:20]
+
+    def write_mails_to_database(self):
+        db = self._db
+        mails = self._mails
+
+        for m in mails:
+            print(m.datetime_received)
+            db.add_mail(m.id, m.subject, m.sender.email_address, m.body, m.datetime_received)
+            # print( m.id)
+        pass
+        db.read_mail()
+
+
+    def main(self):
+        self.get_mails()
+        self.write_mails_to_database()
+
+        # self.analyze_mails()
+        # self.folder_print()
 
 if __name__ == "__main__":
     BNS = BackupNotificationScript()
