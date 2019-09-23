@@ -5,6 +5,8 @@ import datetime
 import load_customer
 import exchange_database
 
+import inspect
+
 class BackupNotificationScript():
     def __init__(self):
         # Set Timezone to local Timezone
@@ -129,16 +131,18 @@ class BackupNotificationScript():
         mails = self._mails
 
         for m in mails:
-            print(m.datetime_received)
-            db.add_mail(m.id, m.subject, m.sender.email_address, m.body, m.datetime_received)
+            # print(m.datetime_received.strftime("%m/%d/%Y, %H:%M:%S"))
+
+            db.add_mail(m.id, m.subject, m.sender.email_address, m.body, m.datetime_received.strftime("%m/%d/%Y, %H:%M:%S"))
             # print( m.id)
-        pass
-        db.read_mail()
+
+        db.get_mail()
 
 
     def main(self):
         self.get_mails()
         self.write_mails_to_database()
+        self.analyze_mails()
 
         # self.analyze_mails()
         # self.folder_print()
